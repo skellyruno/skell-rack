@@ -38,19 +38,17 @@ public:
 
         g.setColour(juce::Colours::grey);
         g.setFont(juce::FontOptions(13.0f));
-        g.drawText("Mix", mixSlider.getBounds().translated(0, mixSlider.getHeight() / 2 + 10), juce::Justification::centred);
-        g.drawText("Time beat", timeSlider.getBounds().translated(0, timeSlider.getHeight() / 2 + 8), juce::Justification::centred);
+        g.drawText("Mix", mixSlider.getX(), mixSlider.getBottom() + 2, mixSlider.getWidth(), 18, juce::Justification::centred);
+        g.drawText("Time", timeSlider.getX(), timeSlider.getBottom() + 2, timeSlider.getWidth(), 18, juce::Justification::centred);
     }
 
     void resized() override
     {
-        auto area = getLocalBounds().removeFromBottom(getHeight() - 40);
-        mixSlider.setBounds(area.removeFromTop(130).withSizeKeepingCentre(95, 95));
-        timeSlider.setBounds(area.removeFromTop(80).withSizeKeepingCentre(48, 48));
+        mixSlider.setBounds(getWidth() / 2 - 40, 50, 80, 80);
+        timeSlider.setBounds(getWidth() / 2 - 25, 170, 50, 50);
     }
 
 private:
-    // CRITICAL: LookAndFeel MUST be declared BEFORE sliders so it outlives them during destruction
     PurpleArcKnobLookAndFeel purpleStyle;
     juce::Slider mixSlider, timeSlider;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> mixAttach, timeAttach;
@@ -63,15 +61,16 @@ public:
     NoiseGateCard(juce::AudioProcessorValueTreeState& apvts)
     {
         attackSlider.setSliderStyle(juce::Slider::LinearHorizontal);
-        attackSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+        attackSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 50, 16);
         addAndMakeVisible(attackSlider);
 
         releaseSlider.setSliderStyle(juce::Slider::LinearHorizontal);
-        releaseSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+        releaseSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 50, 16);
         addAndMakeVisible(releaseSlider);
 
         threshSlider.setSliderStyle(juce::Slider::LinearHorizontal);
-        threshSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+        threshSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 50, 16);
+        addAndMakeVisible(threshSlider);
 
         attackAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, "GATE_ATTACK", attackSlider);
         releaseAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, "GATE_RELEASE", releaseSlider);
@@ -85,72 +84,24 @@ public:
         g.setFont(juce::FontOptions(16.0f, juce::Font::bold));
         g.drawText("Noise Gate", 15, 12, 120, 24, juce::Justification::left);
 
-        auto bounds = getLocalBounds();
-        if (bounds.getHeight() < 180) return;
-
-        auto scopeArea = bounds.removeFromTop(180).removeFromBottom(130).toFloat();
-        if (scopeArea.getHeight() <= 0.0f) return;
-
-        g.setColour(juce::Colours::white.withAlpha(0.05f));
-        g.drawRect(scopeArea);
-
-        juce::Path wave;
-        wave.startNewSubPath(scopeArea.getX(), scopeArea.getCentreY());
-        for (float x = scopeArea.getX(); x < scopeArea.getRight(); x += 5.0f)
-        {
-            float y = scopeArea.getCentreY() + std::sin(x * 0.05f) * 35.0f;
-            wave.lineTo(x, y);
-        }
-        g.setColour(juce::Colour(0xFFFFB703));
-        g.strokePath(wave, juce::PathStrokeType(1.5f));
-
-        float threshVal = static_cast<float>(threshSlider.getValue());
-        float normalizedThresh = juce::jmap(threshVal, -60.0f, 0.0f, scopeArea.getBottom(), scopeArea.getY());
-        g.setColour(juce::Colours::white.withAlpha(0.6f));
-        g.drawDashedLine(juce::Line<float>(scopeArea.getX(), normalizedThresh, scopeArea.getRight(), normalizedThresh), nullptr, 0, 2);
-
-        thresholdPillBounds = juce::Rectangle<float>(scopeArea.getCentreX() - 55.0f, normalizedThresh - 14.0f, 110.0f, 28.0f);
-        g.setColour(juce::Colour(0xFF1E1E1E));
-        g.fillRoundedRectangle(thresholdPillBounds, 14.0f);
-        g.setColour(juce::Colours::white);
-        g.drawRoundedRectangle(thresholdPillBounds, 14.0f, 1.2f);
-        g.setFont(juce::FontOptions(13.0f, juce::Font::bold));
-        g.drawText("Threshold  ↕", thresholdPillBounds, juce::Justification::centred);
-
-        g.drawText(juce::String(threshVal, 1) + " dB", scopeArea.removeFromLeft(80).removeFromTop(30), juce::Justification::centred);
-
         g.setFont(juce::FontOptions(12.0f));
-        g.drawText("Attack: " + juce::String(static_cast<float>(attackSlider.getValue()), 0) + " ms", 15, getHeight() - 40, 100, 20, juce::Justification::left);
-        g.drawText("Release: " + juce::String(static_cast<float>(releaseSlider.getValue()), 0) + " ms", 130, getHeight() - 40, 100, 20, juce::Justification::left);
+        g.setColour(juce::Colours::grey);
+        g.drawText("Threshold", threshSlider.getX(), threshSlider.getY() - 16, threshSlider.getWidth(), 16, juce::Justification::centred);
+        g.drawText("Attack", attackSlider.getX(), attackSlider.getY() - 16, attackSlider.getWidth(), 16, juce::Justification::centred);
+        g.drawText("Release", releaseSlider.getX(), releaseSlider.getY() - 16, releaseSlider.getWidth(), 16, juce::Justification::centred);
     }
 
     void resized() override
     {
-        attackSlider.setBounds(15, getHeight() - 25, 100, 15);
-        releaseSlider.setBounds(130, getHeight() - 25, 100, 15);
-    }
-
-    void mouseDown(const juce::MouseEvent& e) override { if (thresholdPillBounds.contains(e.position)) isDraggingPill = true; }
-    void mouseDrag(const juce::MouseEvent& e) override
-    {
-        if (isDraggingPill)
-        {
-            auto bounds = getLocalBounds();
-            if (bounds.getHeight() < 180) return;
-            auto scopeArea = bounds.removeFromTop(180).removeFromBottom(130).toFloat();
-            if (scopeArea.getHeight() <= 0.0f) return;
-
-            float norm = juce::jlimit(0.0f, 1.0f, (e.position.y - scopeArea.getY()) / scopeArea.getHeight());
-            threshSlider.setValue(juce::jmap(norm, 1.0f, 0.0f, -60.0f, 0.0f));
-            repaint();
-        }
+        int w = getWidth() - 30;
+        threshSlider.setBounds(15, 60, w, 45);
+        attackSlider.setBounds(15, 130, w, 45);
+        releaseSlider.setBounds(15, 200, w, 45);
     }
 
 private:
     juce::Slider attackSlider, releaseSlider, threshSlider;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attackAttach, releaseAttach, threshAttach;
-    juce::Rectangle<float> thresholdPillBounds;
-    bool isDraggingPill = false;
 };
 
 // --- Chorus Ensemble Card UI ---
@@ -188,30 +139,20 @@ public:
         g.setColour(juce::Colours::white);
         g.setFont(juce::FontOptions(16.0f, juce::Font::bold));
         g.drawText("Chorus Ensemble", 15, 12, 160, 24, juce::Justification::left);
-
-        g.setFont(juce::FontOptions(12.0f, juce::Font::bold));
-        g.drawText("Depth", depthSlider.getBounds().translated(0, depthSlider.getHeight() / 2 + 5), juce::Justification::centred);
-        g.drawText("Amount", amountSlider.getBounds().translated(0, amountSlider.getHeight() / 2 + 5), juce::Justification::centred);
-        g.drawText("Speed", speedSlider.getBounds().translated(0, speedSlider.getHeight() / 2 + 5), juce::Justification::centred);
-        g.drawText("Bass", bassSlider.getBounds().translated(0, bassSlider.getHeight() / 2 + 5), juce::Justification::centred);
-        g.drawText("Treble", trebleSlider.getBounds().translated(0, trebleSlider.getHeight() / 2 + 5), juce::Justification::centred);
     }
 
     void resized() override
     {
-        auto topRow = getLocalBounds().removeFromTop(150).removeFromBottom(85);
-        depthSlider.setBounds(topRow.removeFromLeft(getWidth() / 2).withSizeKeepingCentre(52, 52));
-        amountSlider.setBounds(topRow.withSizeKeepingCentre(52, 52));
-
-        auto bottomRow = getLocalBounds().removeFromBottom(110).removeFromTop(80);
         int third = getWidth() / 3;
-        speedSlider.setBounds(bottomRow.removeFromLeft(third).withSizeKeepingCentre(42, 42));
-        bassSlider.setBounds(bottomRow.removeFromLeft(third).withSizeKeepingCentre(42, 42));
-        trebleSlider.setBounds(bottomRow.withSizeKeepingCentre(42, 42));
+        depthSlider.setBounds(20, 50, 55, 55);
+        amountSlider.setBounds(getWidth() - 75, 50, 55, 55);
+
+        speedSlider.setBounds(5, 150, third - 10, 50);
+        bassSlider.setBounds(third + 5, 150, third - 10, 50);
+        trebleSlider.setBounds(third * 2 + 5, 150, third - 10, 50);
     }
 
 private:
-    // CRITICAL: LookAndFeel MUST be declared BEFORE sliders so it outlives them during destruction
     TeardropKnobLookAndFeel teardropStyle;
     juce::Slider depthSlider, amountSlider, speedSlider, bassSlider, trebleSlider;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> depthAttach, amountAttach, speedAttach, bassAttach, trebleAttach;
