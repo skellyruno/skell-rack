@@ -27,6 +27,8 @@ public:
         addAndMakeVisible(moveRightButton);
     }
 
+    virtual ~ModuleUIBase() override = default;
+
     std::function<void(ModuleUIBase*)> onRemoveRequested;
     std::function<void(ModuleUIBase*, int)> onMoveRequested;
     DSPModuleBase* getDSP() const { return dsp; }
@@ -40,10 +42,13 @@ protected:
 
         g.setColour(textColour.withAlpha(0.3f));
         int w = getWidth(), h = getHeight();
-        g.fillRect(2, 2, 8, 8);
-        g.fillRect(w - 10, 2, 8, 8);
-        g.fillRect(2, h - 10, 8, 8);
-        g.fillRect(w - 10, h - 10, 8, 8);
+        if (w > 20 && h > 20)
+        {
+            g.fillRect(2, 2, 8, 8);
+            g.fillRect(w - 10, 2, 8, 8);
+            g.fillRect(2, h - 10, 8, 8);
+            g.fillRect(w - 10, h - 10, 8, 8);
+        }
     }
 
     void resizedHeader()
@@ -69,6 +74,8 @@ public:
 
     void paint(juce::Graphics& g) override;
     void resized() override;
+
+    void triggerUIRebuild();
 
 private:
     ModularFXAudioProcessor& audioProcessor;
