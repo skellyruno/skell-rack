@@ -10,15 +10,13 @@ ModularFXAudioProcessorEditor::ModularFXAudioProcessorEditor(ModularFXAudioProce
         int id = addModuleBox.getSelectedId();
         if (id <= 0) return;
 
+        auto currentOrder = audioProcessor.getModuleOrder();
+        if (std::find(currentOrder.begin(), currentOrder.end(), id) == currentOrder.end())
         {
-            const juce::ScopedLock sl(audioProcessor.processLock);
-            if (std::find(audioProcessor.activeModuleOrder.begin(), audioProcessor.activeModuleOrder.end(), id) == audioProcessor.activeModuleOrder.end())
-            {
-                audioProcessor.activeModuleOrder.push_back(id);
-            }
+            currentOrder.push_back(id);
+            audioProcessor.updateModuleOrder(currentOrder);
         }
 
-        addModuleBox.setSelectedId(0, juce::dontSendNotification);
         triggerUIRebuild();
     };
     addAndMakeVisible(addModuleBox);
@@ -33,6 +31,7 @@ void ModularFXAudioProcessorEditor::triggerUIRebuild()
     juce::MessageManager::callAsync([safeThis]() {
         if (safeThis != nullptr)
         {
+            safeThis->addModuleBox.setSelectedId(0, juce::dontSendNotification);
             safeThis->rebuildRack();
         }
     });
@@ -42,8 +41,8 @@ void ModularFXAudioProcessorEditor::rebuildRack()
 {
     cards.clear();
 
-    const juce::ScopedLock sl(audioProcessor.processLock);
-    for (int modId : audioProcessor.activeModuleOrder)
+    auto currentOrder = audioProcessor.getModuleOrder();
+    for (int modId : currentOrder)
     {
         std::unique_ptr<ModuleCardBase> card;
         if (modId == ID_Reverser) card = std::make_unique<ReverserCard>(audioProcessor);
@@ -53,29 +52,25 @@ void ModularFXAudioProcessorEditor::rebuildRack()
         if (card != nullptr)
         {
             card->onMoveRequested = [this](int id, int direction) {
+                auto order = audioProcessor.getModuleOrder();
+                auto it = std::find(order.begin(), order.end(), id);
+                if (it != order.end())
                 {
-                    const juce::ScopedLock sl(audioProcessor.processLock);
-                    auto it = std::find(audioProcessor.activeModuleOrder.begin(), audioProcessor.activeModuleOrder.end(), id);
-                    if (it != audioProcessor.activeModuleOrder.end())
+                    int idx = static_cast<int>(std::distance(order.begin(), it));
+                    int newIdx = idx + direction;
+                    if (newIdx >= 0 && newIdx < static_cast<int>(order.size()))
                     {
-                        int idx = static_cast<int>(std::distance(audioProcessor.activeModuleOrder.begin(), it));
-                        int newIdx = idx + direction;
-                        if (newIdx >= 0 && newIdx < static_cast<int>(audioProcessor.activeModuleOrder.size()))
-                        {
-                            std::swap(audioProcessor.activeModuleOrder[idx], audioProcessor.activeModuleOrder[newIdx]);
-                        }
+                        std::swap(order[idx], order[newIdx]);
+                        audioProcessor.updateModuleOrder(order);
                     }
                 }
                 triggerUIRebuild();
             };
 
             card->onRemoveRequested = [this](int id) {
-                {
-                    const juce::ScopedLock sl(audioProcessor.processLock);
-                    audioProcessor.activeModuleOrder.erase(
-                        std::remove(audioProcessor.activeModuleOrder.begin(), audioProcessor.activeModuleOrder.end(), id),
-                        audioProcessor.activeModuleOrder.end());
-                }
+                auto order = audioProcessor.getModuleOrder();
+                order.erase(std::remove(order.begin(), order.end(), id), order.end());
+                audioProcessor.updateModuleOrder(order);
                 triggerUIRebuild();
             };
 
