@@ -4,6 +4,11 @@
 class ReverserDSP
 {
 public:
+    ReverserDSP()
+    {
+        prepareToPlay(44100.0, 512);
+    }
+
     void prepareToPlay(double sampleRate, int)
     {
         currentSampleRate = (sampleRate > 1000.0) ? sampleRate : 44100.0;
@@ -61,6 +66,8 @@ private:
 class NoiseGateDSP
 {
 public:
+    NoiseGateDSP() = default;
+
     void prepareToPlay(double, int) {}
 
     void processBlock(juce::AudioBuffer<float>& buffer, float threshDb)
@@ -95,6 +102,11 @@ private:
 class ChorusDSP
 {
 public:
+    ChorusDSP()
+    {
+        prepareToPlay(44100.0, 512);
+    }
+
     void prepareToPlay(double sampleRate, int)
     {
         currentSampleRate = (sampleRate > 1000.0) ? sampleRate : 44100.0;
