@@ -8,20 +8,23 @@ public:
     static void drawPattern(juce::Graphics& g, juce::Rectangle<float> bounds, juce::Colour waveColor)
     {
         g.setColour(waveColor.withAlpha(0.25f));
-        float radiusStep = 14.0f;
-        float rowSpacing = 22.0f;
-        float colSpacing = 44.0f;
+        const float radiusStep = 14.0f;
+        const float rowSpacing = 22.0f;
+        const float colSpacing = 44.0f;
 
         for (float y = bounds.getBottom() + 20.0f; y > bounds.getY() + 80.0f; y -= rowSpacing)
         {
-            float xOffset = (static_cast<int>((bounds.getBottom() - y) / rowSpacing) % 2 == 0) ? 0.0f : colSpacing * 0.5f;
+            const float rowDiff = (bounds.getBottom() - y) / rowSpacing;
+            const float xOffset = (static_cast<int>(rowDiff) % 2 == 0) ? 0.0f : colSpacing * 0.5f;
             for (float x = bounds.getX() - 20.0f + xOffset; x < bounds.getRight() + 20.0f; x += colSpacing)
             {
                 for (int r = 4; r >= 1; --r)
                 {
-                    float currentRadius = r * radiusStep;
+                    const float currentRadius = static_cast<float>(r) * radiusStep;
                     juce::Path arc;
-                    arc.addCentredArc(x, y, currentRadius, currentRadius, 0.0f, -juce::MathConstants<float>::halfPi, juce::MathConstants<float>::halfPi, true);
+                    arc.addCentredArc(x, y, currentRadius, currentRadius, 0.0f,
+                                      -juce::MathConstants<float>::halfPi,
+                                      juce::MathConstants<float>::halfPi, true);
                     g.strokePath(arc, juce::PathStrokeType(1.5f));
                 }
             }
@@ -35,15 +38,18 @@ class TeardropKnobLookAndFeel : public juce::LookAndFeel_V4
 public:
     void drawRotarySlider(juce::Graphics& g, int x, int y, int width, int height,
                           float sliderPosProportional, float rotaryStartAngle,
-                          float rotaryEndAngle, juce::Slider& slider) override
+                          float rotaryEndAngle, juce::Slider& /*slider*/) override
     {
-        auto bounds = juce::Rectangle<float>(x, y, width, height).reduced(6.0f);
+        auto bounds = juce::Rectangle<float>(static_cast<float>(x),
+                                            static_cast<float>(y),
+                                            static_cast<float>(width),
+                                            static_cast<float>(height)).reduced(6.0f);
         auto center = bounds.getCentre();
         auto radius = juce::jmin(bounds.getWidth(), bounds.getHeight()) * 0.5f;
         auto angle = rotaryStartAngle + sliderPosProportional * (rotaryEndAngle - rotaryStartAngle);
 
         g.setColour(juce::Colours::black.withAlpha(0.15f));
-        g.fillEllipse(bounds.translated(0, 3.0f));
+        g.fillEllipse(bounds.translated(0.0f, 3.0f));
 
         juce::Path teardrop;
         float topY = center.y - radius;
@@ -74,9 +80,12 @@ class PurpleArcKnobLookAndFeel : public juce::LookAndFeel_V4
 public:
     void drawRotarySlider(juce::Graphics& g, int x, int y, int width, int height,
                           float sliderPosProportional, float rotaryStartAngle,
-                          float rotaryEndAngle, juce::Slider& slider) override
+                          float rotaryEndAngle, juce::Slider& /*slider*/) override
     {
-        auto bounds = juce::Rectangle<float>(x, y, width, height).reduced(8.0f);
+        auto bounds = juce::Rectangle<float>(static_cast<float>(x),
+                                            static_cast<float>(y),
+                                            static_cast<float>(width),
+                                            static_cast<float>(height)).reduced(8.0f);
         auto center = bounds.getCentre();
         auto radius = juce::jmin(bounds.getWidth(), bounds.getHeight()) * 0.5f;
         auto angle = rotaryStartAngle + sliderPosProportional * (rotaryEndAngle - rotaryStartAngle);
