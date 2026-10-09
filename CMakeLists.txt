@@ -34,6 +34,7 @@ target_sources(ModularFXSuite
         Source/PluginProcessor.cpp
         Source/PluginEditor.h
         Source/PluginEditor.cpp
+        Source/Modules/DSPModules.h
 )
 
 target_compile_definitions(ModularFXSuite
