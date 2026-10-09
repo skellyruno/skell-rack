@@ -13,11 +13,13 @@ ModularFXAudioProcessor::ModularFXAudioProcessor()
 
 bool ModularFXAudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
 {
-    if (layouts.getMainOutputChannelSet() != juce::AudioChannelSet::mono()
-     && layouts.getMainOutputChannelSet() != juce::AudioChannelSet::stereo())
+    auto mainInput = layouts.getMainInputChannelSet();
+    auto mainOutput = layouts.getMainOutputChannelSet();
+
+    if (mainOutput != juce::AudioChannelSet::mono() && mainOutput != juce::AudioChannelSet::stereo())
         return false;
 
-    if (layouts.getMainOutputChannelSet() != layouts.getMainInputChannelSet())
+    if (mainInput != mainOutput)
         return false;
 
     return true;
@@ -43,11 +45,14 @@ juce::AudioProcessorValueTreeState::ParameterLayout ModularFXAudioProcessor::cre
 
 void ModularFXAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
+    lastSampleRate = (sampleRate > 1000.0) ? sampleRate : 44100.0;
+    lastBlockSize = (samplesPerBlock > 0) ? samplesPerBlock : 512;
+
     const juce::ScopedLock sl(processLock);
     for (auto& dsp : dspChain)
     {
         if (dsp != nullptr)
-            dsp->prepareToPlay(sampleRate, samplesPerBlock);
+            dsp->prepareToPlay(lastSampleRate, lastBlockSize);
     }
 }
 
@@ -83,6 +88,8 @@ void ModularFXAudioProcessor::getStateInformation(juce::MemoryBlock& destData)
 
 void ModularFXAudioProcessor::setStateInformation(const void* data, int sizeInBytes)
 {
+    if (data == nullptr || sizeInBytes <= 0) return;
+
     std::unique_ptr<juce::XmlElement> xmlState(getXmlFromBinary(data, sizeInBytes));
     if (xmlState != nullptr && xmlState->hasTagName(apvts.state.getType()))
         apvts.replaceState(juce::ValueTree::fromXml(*xmlState));
