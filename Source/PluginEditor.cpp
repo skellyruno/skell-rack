@@ -1,4 +1,3 @@
-#include "PluginEditor.cpp"
 #include "PluginEditor.h"
 
 ModularFXAudioProcessorEditor::ModularFXAudioProcessorEditor(ModularFXAudioProcessor& p)
