@@ -63,9 +63,13 @@ void ModularFXAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juc
     float depth = choDepthParam ? choDepthParam->load() : 0.0f;
     float speed = choSpeedParam ? choSpeedParam->load() : 1.0f;
 
-    if (mix > 0.001f) reverser.processBlock(buffer, mix);
-    if (thresh > -59.0f) noiseGate.processBlock(buffer, thresh);
-    if (depth > 0.001f) chorus.processBlock(buffer, depth, speed);
+    const juce::ScopedLock sl(processLock);
+    for (int modId : activeModuleOrder)
+    {
+        if (modId == ID_Reverser) reverser.processBlock(buffer, mix);
+        else if (modId == ID_NoiseGate) noiseGate.processBlock(buffer, thresh);
+        else if (modId == ID_Chorus) chorus.processBlock(buffer, depth, speed);
+    }
 }
 
 juce::AudioProcessorEditor* ModularFXAudioProcessor::createEditor()
