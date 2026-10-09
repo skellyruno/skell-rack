@@ -6,9 +6,7 @@ ModularFXAudioProcessor::ModularFXAudioProcessor()
                                       .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
       apvts(*this, nullptr, "Parameters", createParameterLayout())
 {
-    dspChain.push_back(std::make_unique<ReverserDSP>(apvts));
-    dspChain.push_back(std::make_unique<NoiseGateDSP>(apvts));
-    dspChain.push_back(std::make_unique<ChorusDSP>(apvts));
+    gainParam = apvts.getRawParameterValue("GAIN");
 }
 
 bool ModularFXAudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
@@ -19,57 +17,33 @@ bool ModularFXAudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts)
     if (mainOutput != juce::AudioChannelSet::mono() && mainOutput != juce::AudioChannelSet::stereo())
         return false;
 
-    if (mainInput != mainOutput)
-        return false;
-
-    return true;
+    return mainInput == mainOutput;
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout ModularFXAudioProcessor::createParameterLayout()
 {
     std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
-
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("REV_MIX", "Reverser Mix", 0.0f, 1.0f, 0.5f));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("REV_TIME", "Reverser Time", 0.0f, 1.0f, 0.25f));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("GATE_THRESH", "Gate Threshold", -60.0f, 0.0f, -30.0f));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("GATE_ATTACK", "Gate Attack", 1.0f, 100.0f, 37.0f));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("GATE_RELEASE", "Gate Release", 10.0f, 1000.0f, 200.0f));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("CHO_DEPTH", "Chorus Depth", 0.0f, 1.0f, 0.6f));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("CHO_AMOUNT", "Chorus Amount", 0.0f, 1.0f, 0.5f));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("CHO_SPEED", "Chorus Speed", 0.1f, 10.0f, 1.2f));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("CHO_BASS", "Chorus Bass", -12.0f, 12.0f, 0.0f));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("CHO_TREBLE", "Chorus Treble", -12.0f, 12.0f, 0.0f));
-
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("GAIN", "Master Gain", 0.0f, 1.0f, 0.8f));
     return { params.begin(), params.end() };
 }
 
-void ModularFXAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
-{
-    lastSampleRate = (sampleRate > 1000.0) ? sampleRate : 44100.0;
-    lastBlockSize = (samplesPerBlock > 0) ? samplesPerBlock : 512;
+void ModularFXAudioProcessor::prepareToPlay(double, int) {}
 
-    const juce::ScopedLock sl(processLock);
-    for (auto& dsp : dspChain)
-    {
-        if (dsp != nullptr)
-            dsp->prepareToPlay(lastSampleRate, lastBlockSize);
-    }
-}
-
-void ModularFXAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi)
+void ModularFXAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
 {
     juce::ScopedNoDenormals noDenormals;
-    auto totalNumInputChannels  = getTotalNumInputChannels();
+
+    auto totalNumInputChannels = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
 
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
-        buffer.clear (i, 0, buffer.getNumSamples());
+        buffer.clear(i, 0, buffer.getNumSamples());
 
-    const juce::ScopedLock sl(processLock);
-    for (auto& dsp : dspChain)
+    float currentGain = gainParam ? gainParam->load() : 1.0f;
+
+    for (int ch = 0; ch < totalNumInputChannels; ++ch)
     {
-        if (dsp != nullptr)
-            dsp->processBlock(buffer, midi);
+        buffer.applyGain(ch, 0, buffer.getNumSamples(), currentGain);
     }
 }
 
