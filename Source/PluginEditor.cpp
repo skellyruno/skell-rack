@@ -1,25 +1,14 @@
 #include "PluginEditor.h"
 
 ModularFXAudioProcessorEditor::ModularFXAudioProcessorEditor(ModularFXAudioProcessor& p)
-    : AudioProcessorEditor(&p), audioProcessor(p)
+    : AudioProcessorEditor(&p), audioProcessor(p),
+      reverserCard(p.apvts), noiseGateCard(p.apvts), chorusCard(p.apvts)
 {
-    revMixSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
-    revMixSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 20);
-    addAndMakeVisible(revMixSlider);
+    addAndMakeVisible(reverserCard);
+    addAndMakeVisible(noiseGateCard);
+    addAndMakeVisible(chorusCard);
 
-    gateThreshSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
-    gateThreshSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 20);
-    addAndMakeVisible(gateThreshSlider);
-
-    choDepthSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
-    choDepthSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 20);
-    addAndMakeVisible(choDepthSlider);
-
-    revMixAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.apvts, "REV_MIX", revMixSlider);
-    gateThreshAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.apvts, "GATE_THRESH", gateThreshSlider);
-    choDepthAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(audioProcessor.apvts, "CHO_DEPTH", choDepthSlider);
-
-    setSize(600, 300);
+    setSize(900, 350);
 }
 
 void ModularFXAudioProcessorEditor::paint(juce::Graphics& g)
@@ -27,17 +16,19 @@ void ModularFXAudioProcessorEditor::paint(juce::Graphics& g)
     g.fillAll(juce::Colour(0xFF1E1E1E));
     g.setColour(juce::Colours::white);
     g.setFont(juce::FontOptions(18.0f, juce::Font::bold));
-    g.drawText("Modular FX Suite - Step A (Fixed DSP)", getLocalBounds().removeFromTop(40), juce::Justification::centred);
-
-    g.setFont(juce::FontOptions(12.0f));
-    g.drawText("Reverser", 50, 230, 100, 20, juce::Justification::centred);
-    g.drawText("Gate Thresh", 250, 230, 100, 20, juce::Justification::centred);
-    g.drawText("Chorus Depth", 450, 230, 100, 20, juce::Justification::centred);
+    g.drawText("Modular FX Suite", 16, 10, 200, 30, juce::Justification::left);
 }
 
 void ModularFXAudioProcessorEditor::resized()
 {
-    revMixSlider.setBounds(50, 80, 100, 140);
-    gateThreshSlider.setBounds(250, 80, 100, 140);
-    choDepthSlider.setBounds(450, 80, 100, 140);
+    auto rackArea = getLocalBounds().removeFromBottom(getHeight() - 45).reduced(10);
+    int modWidth = (rackArea.getWidth() - 20) / 3;
+
+    reverserCard.setBounds(rackArea.removeFromLeft(modWidth));
+    rackArea.removeFromLeft(10);
+
+    noiseGateCard.setBounds(rackArea.removeFromLeft(modWidth));
+    rackArea.removeFromLeft(10);
+
+    chorusCard.setBounds(rackArea.removeFromLeft(modWidth));
 }
