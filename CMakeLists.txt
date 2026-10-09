@@ -30,7 +30,6 @@ juce_generate_juce_header(ModularFXSuite)
 
 target_sources(ModularFXSuite
     PRIVATE
-        Source/CustomLookAndFeel.h
         Source/PluginProcessor.h
         Source/PluginProcessor.cpp
         Source/PluginEditor.h
