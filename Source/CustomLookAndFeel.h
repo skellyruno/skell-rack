@@ -6,7 +6,7 @@ class SeigaihaDrawer
 public:
     static void drawPattern(juce::Graphics& g, juce::Rectangle<float> bounds, juce::Colour waveColor)
     {
-        if (bounds.isEmpty()) return;
+        if (bounds.isEmpty() || bounds.getWidth() <= 0.0f || bounds.getHeight() <= 0.0f) return;
 
         g.setColour(waveColor.withAlpha(0.25f));
         const float radiusStep = 14.0f;
