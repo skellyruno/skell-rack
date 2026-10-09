@@ -1,8 +1,13 @@
 #include "PluginEditor.h"
 
 ModularFXAudioProcessorEditor::ModularFXAudioProcessorEditor(ModularFXAudioProcessor& p)
-    : AudioProcessorEditor(&p), audioProcessor(p)
+    : AudioProcessorEditor(&p), audioProcessor(p),
+      reverserCard(p), noiseGateCard(p), chorusCard(p)
 {
+    addAndMakeVisible(reverserCard);
+    addAndMakeVisible(noiseGateCard);
+    addAndMakeVisible(chorusCard);
+
     addModuleBox.addItem("+ Add Reverser", ID_Reverser);
     addModuleBox.addItem("+ Add Noise Gate", ID_NoiseGate);
     addModuleBox.addItem("+ Add Chorus Ensemble", ID_Chorus);
@@ -17,70 +22,54 @@ ModularFXAudioProcessorEditor::ModularFXAudioProcessorEditor(ModularFXAudioProce
             audioProcessor.updateModuleOrder(currentOrder);
         }
 
-        triggerUIRebuild();
+        juce::MessageManager::callAsync([this]() {
+            addModuleBox.setSelectedId(0, juce::dontSendNotification);
+            resized();
+            repaint();
+        });
     };
     addAndMakeVisible(addModuleBox);
 
+    updateCardCallbacks();
+
     setSize(880, 340);
-    rebuildRack();
 }
 
-void ModularFXAudioProcessorEditor::triggerUIRebuild()
+void ModularFXAudioProcessorEditor::updateCardCallbacks()
 {
-    juce::Component::SafePointer<ModularFXAudioProcessorEditor> safeThis(this);
-    juce::MessageManager::callAsync([safeThis]() {
-        if (safeThis != nullptr)
+    auto handleMove = [this](int id, int direction) {
+        auto order = audioProcessor.getModuleOrder();
+        auto it = std::find(order.begin(), order.end(), id);
+        if (it != order.end())
         {
-            safeThis->addModuleBox.setSelectedId(0, juce::dontSendNotification);
-            safeThis->rebuildRack();
-        }
-    });
-}
-
-void ModularFXAudioProcessorEditor::rebuildRack()
-{
-    cards.clear();
-
-    auto currentOrder = audioProcessor.getModuleOrder();
-    for (int modId : currentOrder)
-    {
-        std::unique_ptr<ModuleCardBase> card;
-        if (modId == ID_Reverser) card = std::make_unique<ReverserCard>(audioProcessor);
-        else if (modId == ID_NoiseGate) card = std::make_unique<NoiseGateCard>(audioProcessor);
-        else if (modId == ID_Chorus) card = std::make_unique<ChorusCard>(audioProcessor);
-
-        if (card != nullptr)
-        {
-            card->onMoveRequested = [this](int id, int direction) {
-                auto order = audioProcessor.getModuleOrder();
-                auto it = std::find(order.begin(), order.end(), id);
-                if (it != order.end())
-                {
-                    int idx = static_cast<int>(std::distance(order.begin(), it));
-                    int newIdx = idx + direction;
-                    if (newIdx >= 0 && newIdx < static_cast<int>(order.size()))
-                    {
-                        std::swap(order[idx], order[newIdx]);
-                        audioProcessor.updateModuleOrder(order);
-                    }
-                }
-                triggerUIRebuild();
-            };
-
-            card->onRemoveRequested = [this](int id) {
-                auto order = audioProcessor.getModuleOrder();
-                order.erase(std::remove(order.begin(), order.end(), id), order.end());
+            int idx = static_cast<int>(std::distance(order.begin(), it));
+            int newIdx = idx + direction;
+            if (newIdx >= 0 && newIdx < static_cast<int>(order.size()))
+            {
+                std::swap(order[idx], order[newIdx]);
                 audioProcessor.updateModuleOrder(order);
-                triggerUIRebuild();
-            };
-
-            addAndMakeVisible(card.get());
-            cards.push_back(std::move(card));
+                resized();
+                repaint();
+            }
         }
-    }
+    };
 
-    resized();
-    repaint();
+    auto handleRemove = [this](int id) {
+        auto order = audioProcessor.getModuleOrder();
+        order.erase(std::remove(order.begin(), order.end(), id), order.end());
+        audioProcessor.updateModuleOrder(order);
+        resized();
+        repaint();
+    };
+
+    reverserCard.onMoveRequested = handleMove;
+    reverserCard.onRemoveRequested = handleRemove;
+
+    noiseGateCard.onMoveRequested = handleMove;
+    noiseGateCard.onRemoveRequested = handleRemove;
+
+    chorusCard.onMoveRequested = handleMove;
+    chorusCard.onRemoveRequested = handleRemove;
 }
 
 void ModularFXAudioProcessorEditor::paint(juce::Graphics& g)
@@ -96,13 +85,28 @@ void ModularFXAudioProcessorEditor::resized()
     addModuleBox.setBounds(getWidth() - 170, 10, 150, 24);
 
     auto rackArea = getLocalBounds().removeFromBottom(getHeight() - 45).reduced(10);
-    int numModules = static_cast<int>(cards.size());
-    if (numModules == 0) return;
+    auto currentOrder = audioProcessor.getModuleOrder();
 
-    int modWidth = (rackArea.getWidth() - (10 * (numModules - 1))) / numModules;
-    for (int i = 0; i < numModules; ++i)
+    reverserCard.setVisible(std::find(currentOrder.begin(), currentOrder.end(), ID_Reverser) != currentOrder.end());
+    noiseGateCard.setVisible(std::find(currentOrder.begin(), currentOrder.end(), ID_NoiseGate) != currentOrder.end());
+    chorusCard.setVisible(std::find(currentOrder.begin(), currentOrder.end(), ID_Chorus) != currentOrder.end());
+
+    int numVisible = static_cast<int>(currentOrder.size());
+    if (numVisible == 0) return;
+
+    int modWidth = (rackArea.getWidth() - (10 * (numVisible - 1))) / numVisible;
+
+    for (int id : currentOrder)
     {
-        cards[i]->setBounds(rackArea.removeFromLeft(modWidth));
-        rackArea.removeFromLeft(10);
+        ModuleCardBase* card = nullptr;
+        if (id == ID_Reverser) card = &reverserCard;
+        else if (id == ID_NoiseGate) card = &noiseGateCard;
+        else if (id == ID_Chorus) card = &chorusCard;
+
+        if (card != nullptr && card->isVisible())
+        {
+            card->setBounds(rackArea.removeFromLeft(modWidth));
+            rackArea.removeFromLeft(10);
+        }
     }
 }
