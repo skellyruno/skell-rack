@@ -304,12 +304,13 @@ public:
     void paint(juce::Graphics& g) override;
     void resized() override;
 
-    void triggerUIRebuild();
-
 private:
     ModularFXAudioProcessor& audioProcessor;
     juce::ComboBox addModuleBox;
 
-    std::vector<std::unique_ptr<ModuleCardBase>> cards;
-    void rebuildRack();
+    ReverserCard reverserCard;
+    NoiseGateCard noiseGateCard;
+    ChorusCard chorusCard;
+
+    void updateCardCallbacks();
 };
