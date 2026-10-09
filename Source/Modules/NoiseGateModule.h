@@ -1,4 +1,5 @@
 #pragma once
+
 #include "ModuleBase.h"
 
 class NoiseGateModule : public ModuleBase
