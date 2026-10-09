@@ -6,7 +6,10 @@ ModularFXAudioProcessor::ModularFXAudioProcessor()
                                       .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
       apvts(*this, nullptr, "Parameters", createParameterLayout())
 {
-    gainParam = apvts.getRawParameterValue("GAIN");
+    revMixParam = apvts.getRawParameterValue("REV_MIX");
+    gateThreshParam = apvts.getRawParameterValue("GATE_THRESH");
+    choDepthParam = apvts.getRawParameterValue("CHO_DEPTH");
+    choSpeedParam = apvts.getRawParameterValue("CHO_SPEED");
 }
 
 bool ModularFXAudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
@@ -23,11 +26,19 @@ bool ModularFXAudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts)
 juce::AudioProcessorValueTreeState::ParameterLayout ModularFXAudioProcessor::createParameterLayout()
 {
     std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("GAIN", "Master Gain", 0.0f, 1.0f, 0.8f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("REV_MIX", "Reverser Mix", 0.0f, 1.0f, 0.0f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("GATE_THRESH", "Gate Threshold", -60.0f, 0.0f, -60.0f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("CHO_DEPTH", "Chorus Depth", 0.0f, 1.0f, 0.0f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("CHO_SPEED", "Chorus Speed", 0.1f, 5.0f, 1.0f));
     return { params.begin(), params.end() };
 }
 
-void ModularFXAudioProcessor::prepareToPlay(double, int) {}
+void ModularFXAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
+{
+    reverser.prepareToPlay(sampleRate, samplesPerBlock);
+    noiseGate.prepareToPlay(sampleRate, samplesPerBlock);
+    chorus.prepareToPlay(sampleRate, samplesPerBlock);
+}
 
 void ModularFXAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
 {
@@ -39,12 +50,14 @@ void ModularFXAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juc
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
         buffer.clear(i, 0, buffer.getNumSamples());
 
-    float currentGain = gainParam ? gainParam->load() : 1.0f;
+    float mix = revMixParam ? revMixParam->load() : 0.0f;
+    float thresh = gateThreshParam ? gateThreshParam->load() : -60.0f;
+    float depth = choDepthParam ? choDepthParam->load() : 0.0f;
+    float speed = choSpeedParam ? choSpeedParam->load() : 1.0f;
 
-    for (int ch = 0; ch < totalNumInputChannels; ++ch)
-    {
-        buffer.applyGain(ch, 0, buffer.getNumSamples(), currentGain);
-    }
+    if (mix > 0.001f) reverser.processBlock(buffer, mix);
+    if (thresh > -59.0f) noiseGate.processBlock(buffer, thresh);
+    if (depth > 0.001f) chorus.processBlock(buffer, depth, speed);
 }
 
 juce::AudioProcessorEditor* ModularFXAudioProcessor::createEditor()
