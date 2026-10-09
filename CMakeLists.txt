@@ -27,6 +27,8 @@ juce_add_plugin(ModularFXSuite
     PRODUCT_NAME "Modular FX Suite"
 )
 
+juce_generate_juce_header(ModularFXSuite)
+
 target_sources(ModularFXSuite
     PRIVATE
         Source/CustomLookAndFeel.h
