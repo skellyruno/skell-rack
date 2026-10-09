@@ -34,6 +34,9 @@ public:
     std::vector<std::unique_ptr<DSPModuleBase>> dspChain;
     juce::CriticalSection processLock;
 
+    double lastSampleRate = 44100.0;
+    int lastBlockSize = 512;
+
 private:
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 };
