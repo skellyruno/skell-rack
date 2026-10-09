@@ -26,10 +26,18 @@ bool ModularFXAudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts)
 juce::AudioProcessorValueTreeState::ParameterLayout ModularFXAudioProcessor::createParameterLayout()
 {
     std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("REV_MIX", "Reverser Mix", 0.0f, 1.0f, 0.0f));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("GATE_THRESH", "Gate Threshold", -60.0f, 0.0f, -60.0f));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("CHO_DEPTH", "Chorus Depth", 0.0f, 1.0f, 0.0f));
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("CHO_SPEED", "Chorus Speed", 0.1f, 5.0f, 1.0f));
+
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("REV_MIX", "Reverser Mix", 0.0f, 1.0f, 0.5f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("REV_TIME", "Reverser Time", 0.0f, 1.0f, 0.25f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("GATE_THRESH", "Gate Threshold", -60.0f, 0.0f, -30.0f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("GATE_ATTACK", "Gate Attack", 1.0f, 100.0f, 37.0f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("GATE_RELEASE", "Gate Release", 10.0f, 1000.0f, 200.0f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("CHO_DEPTH", "Chorus Depth", 0.0f, 1.0f, 0.6f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("CHO_AMOUNT", "Chorus Amount", 0.0f, 1.0f, 0.5f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("CHO_SPEED", "Chorus Speed", 0.1f, 5.0f, 1.2f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("CHO_BASS", "Chorus Bass", -12.0f, 12.0f, 0.0f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("CHO_TREBLE", "Chorus Treble", -12.0f, 12.0f, 0.0f));
+
     return { params.begin(), params.end() };
 }
 
