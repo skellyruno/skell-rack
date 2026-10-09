@@ -1,6 +1,5 @@
 #include "PluginEditor.h"
 
-// --- UI Implementations ---
 class ReverserUI : public ModuleUIBase
 {
 public:
@@ -45,9 +44,9 @@ public:
     }
 
 private:
+    PurpleArcKnobLookAndFeel purpleStyle;
     juce::Slider mixSlider, timeSlider;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> mixAttach, timeAttach;
-    PurpleArcKnobLookAndFeel purpleStyle;
 };
 
 class NoiseGateUI : public ModuleUIBase
@@ -62,6 +61,9 @@ public:
         releaseSlider.setSliderStyle(juce::Slider::LinearHorizontal);
         releaseSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
         addAndMakeVisible(releaseSlider);
+
+        threshSlider.setSliderStyle(juce::Slider::LinearHorizontal);
+        threshSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
 
         attackAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, "GATE_ATTACK", attackSlider);
         releaseAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, "GATE_RELEASE", releaseSlider);
@@ -188,9 +190,9 @@ public:
     }
 
 private:
+    TeardropKnobLookAndFeel teardropStyle;
     juce::Slider depthSlider, amountSlider, speedSlider, bassSlider, trebleSlider;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> depthAttach, amountAttach, speedAttach, bassAttach, trebleAttach;
-    TeardropKnobLookAndFeel teardropStyle;
 };
 
 // --- Editor Core ---
@@ -202,16 +204,33 @@ ModularFXAudioProcessorEditor::ModularFXAudioProcessorEditor(ModularFXAudioProce
     addModuleBox.addItem("Add Chorus Ensemble", 3);
     addModuleBox.onChange = [this] {
         int id = addModuleBox.getSelectedId();
-        juce::ScopedLock sl(audioProcessor.processLock);
-        if (id == 1) audioProcessor.dspChain.push_back(std::make_unique<ReverserDSP>(audioProcessor.apvts));
-        if (id == 2) audioProcessor.dspChain.push_back(std::make_unique<NoiseGateDSP>(audioProcessor.apvts));
-        if (id == 3) audioProcessor.dspChain.push_back(std::make_unique<ChorusDSP>(audioProcessor.apvts));
-        rebuildUIFromDSP();
+        if (id <= 0) return;
+
+        {
+            const juce::ScopedLock sl(audioProcessor.processLock);
+            if (id == 1) audioProcessor.dspChain.push_back(std::make_unique<ReverserDSP>(audioProcessor.apvts));
+            else if (id == 2) audioProcessor.dspChain.push_back(std::make_unique<NoiseGateDSP>(audioProcessor.apvts));
+            else if (id == 3) audioProcessor.dspChain.push_back(std::make_unique<ChorusDSP>(audioProcessor.apvts));
+        }
+
+        addModuleBox.setSelectedId(0, juce::dontSendNotification);
+        triggerUIRebuild();
     };
     addAndMakeVisible(addModuleBox);
 
     setSize(900, 380);
     rebuildUIFromDSP();
+}
+
+void ModularFXAudioProcessorEditor::triggerUIRebuild()
+{
+    juce::Component::SafePointer<ModularFXAudioProcessorEditor> safeThis(this);
+    juce::MessageManager::callAsync([safeThis]() {
+        if (safeThis != nullptr)
+        {
+            safeThis->rebuildUIFromDSP();
+        }
+    });
 }
 
 void ModularFXAudioProcessorEditor::rebuildUIFromDSP()
@@ -225,33 +244,37 @@ void ModularFXAudioProcessorEditor::rebuildUIFromDSP()
         else if (dsp->getType() == ModuleType::NoiseGate) ui = std::make_unique<NoiseGateUI>(dsp.get(), audioProcessor.apvts);
         else if (dsp->getType() == ModuleType::Chorus) ui = std::make_unique<ChorusUI>(dsp.get(), audioProcessor.apvts);
 
-        if (ui)
+        if (ui != nullptr)
         {
             ui->onRemoveRequested = [this](ModuleUIBase* target) {
-                juce::ScopedLock sl(audioProcessor.processLock);
                 auto dspTarget = target->getDSP();
-                audioProcessor.dspChain.erase(
-                    std::remove_if(audioProcessor.dspChain.begin(), audioProcessor.dspChain.end(),
-                                   [dspTarget](const std::unique_ptr<DSPModuleBase>& m) { return m.get() == dspTarget; }),
-                    audioProcessor.dspChain.end());
-                rebuildUIFromDSP();
+                {
+                    const juce::ScopedLock sl(audioProcessor.processLock);
+                    audioProcessor.dspChain.erase(
+                        std::remove_if(audioProcessor.dspChain.begin(), audioProcessor.dspChain.end(),
+                                       [dspTarget](const std::unique_ptr<DSPModuleBase>& m) { return m.get() == dspTarget; }),
+                        audioProcessor.dspChain.end());
+                }
+                triggerUIRebuild();
             };
 
             ui->onMoveRequested = [this](ModuleUIBase* target, int direction) {
-                juce::ScopedLock sl(audioProcessor.processLock);
                 auto dspTarget = target->getDSP();
-                auto it = std::find_if(audioProcessor.dspChain.begin(), audioProcessor.dspChain.end(),
-                                       [dspTarget](const std::unique_ptr<DSPModuleBase>& m) { return m.get() == dspTarget; });
-                if (it != audioProcessor.dspChain.end())
                 {
-                    int idx = static_cast<int>(std::distance(audioProcessor.dspChain.begin(), it));
-                    int newIdx = idx + direction;
-                    if (newIdx >= 0 && newIdx < static_cast<int>(audioProcessor.dspChain.size()))
+                    const juce::ScopedLock sl(audioProcessor.processLock);
+                    auto it = std::find_if(audioProcessor.dspChain.begin(), audioProcessor.dspChain.end(),
+                                           [dspTarget](const std::unique_ptr<DSPModuleBase>& m) { return m.get() == dspTarget; });
+                    if (it != audioProcessor.dspChain.end())
                     {
-                        std::swap(audioProcessor.dspChain[idx], audioProcessor.dspChain[newIdx]);
-                        rebuildUIFromDSP();
+                        int idx = static_cast<int>(std::distance(audioProcessor.dspChain.begin(), it));
+                        int newIdx = idx + direction;
+                        if (newIdx >= 0 && newIdx < static_cast<int>(audioProcessor.dspChain.size()))
+                        {
+                            std::swap(audioProcessor.dspChain[idx], audioProcessor.dspChain[newIdx]);
+                        }
                     }
                 }
+                triggerUIRebuild();
             };
 
             addAndMakeVisible(ui.get());
