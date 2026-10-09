@@ -14,6 +14,6 @@ public:
 private:
     ModularFXAudioProcessor& audioProcessor;
 
-    juce::Slider gainSlider;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> gainAttachment;
+    juce::Slider revMixSlider, gateThreshSlider, choDepthSlider;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> revMixAttach, gateThreshAttach, choDepthAttach;
 };
