@@ -3,7 +3,6 @@
 
 enum class ModuleType { Reverser, NoiseGate, Chorus };
 
-// Pure C++ DSP Base (No juce::Component)
 class DSPModuleBase
 {
 public:
@@ -13,8 +12,8 @@ public:
     virtual void prepareToPlay(double sampleRate, int samplesPerBlock) = 0;
     virtual void processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi) = 0;
 
-    void setBypassed(bool bypass) { bypassed.store(bypass); }
-    bool isBypassed() const { return bypassed.load(); }
+    void setBypassed(bool bypass) { bypassed.store(bypass, std::memory_order_relaxed); }
+    bool isBypassed() const { return bypassed.load(std::memory_order_relaxed); }
     ModuleType getType() const { return type; }
 
 protected:
@@ -31,8 +30,11 @@ public:
 
     void prepareToPlay(double sampleRate, int) override
     {
-        currentSampleRate = (sampleRate > 0.0) ? sampleRate : 44100.0;
-        circularBuffer.setSize(2, static_cast<int>(currentSampleRate * 2.0));
+        currentSampleRate = (sampleRate > 1000.0) ? sampleRate : 44100.0;
+        int bufSamples = static_cast<int>(currentSampleRate * 2.0);
+        if (bufSamples <= 0) bufSamples = 88200;
+
+        circularBuffer.setSize(2, bufSamples, false, true, true);
         circularBuffer.clear();
         writePos = 0;
     }
@@ -41,21 +43,25 @@ public:
     {
         if (isBypassed()) return;
 
+        int numInputChannels = buffer.getNumChannels();
+        int numSamples = buffer.getNumSamples();
+        int bufSize = circularBuffer.getNumSamples();
+
+        if (numInputChannels == 0 || numSamples == 0 || bufSize <= 0) return;
+
         auto* mixParam = apvts.getRawParameterValue("REV_MIX");
         float mix = mixParam ? mixParam->load() : 0.5f;
 
-        int bufSize = circularBuffer.getNumSamples();
-        if (bufSize <= 0) return;
-
+        int processChannels = std::min(numInputChannels, circularBuffer.getNumChannels());
         int grainSize = static_cast<int>(currentSampleRate * 0.25);
         if (grainSize <= 0) grainSize = 1000;
 
-        for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
+        for (int ch = 0; ch < processChannels; ++ch)
         {
             auto* channelData = buffer.getWritePointer(ch);
             auto* ringData = circularBuffer.getWritePointer(ch);
 
-            for (int i = 0; i < buffer.getNumSamples(); ++i)
+            for (int i = 0; i < numSamples; ++i)
             {
                 float dry = channelData[i];
                 ringData[writePos] = dry;
@@ -67,7 +73,7 @@ public:
                 float wet = ringData[readPos];
                 channelData[i] = dry * (1.0f - mix) + wet * mix;
 
-                if (ch == buffer.getNumChannels() - 1)
+                if (ch == processChannels - 1)
                     writePos = (writePos + 1) % bufSize;
             }
         }
@@ -93,17 +99,21 @@ public:
     {
         if (isBypassed()) return;
 
+        int numChannels = buffer.getNumChannels();
+        int numSamples = buffer.getNumSamples();
+        if (numChannels == 0 || numSamples == 0) return;
+
         auto* threshParam = apvts.getRawParameterValue("GATE_THRESH");
         float threshDb = threshParam ? threshParam->load() : -30.0f;
         float threshLinear = juce::Decibels::decibelsToGain(threshDb);
 
-        for (int i = 0; i < buffer.getNumSamples(); ++i)
+        for (int i = 0; i < numSamples; ++i)
         {
             float level = std::abs(buffer.getSample(0, i));
             currentEnvelope = level > threshLinear ? level : currentEnvelope * 0.99f;
             float gain = currentEnvelope > threshLinear ? 1.0f : 0.0f;
 
-            for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
+            for (int ch = 0; ch < numChannels; ++ch)
                 buffer.setSample(ch, i, buffer.getSample(ch, i) * gain);
         }
     }
