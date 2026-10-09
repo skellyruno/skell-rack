@@ -1,82 +1,70 @@
+#include "PluginProcessor.h"
 #include "PluginEditor.h"
-#include "Modules/ReverserModule.h"
-#include "Modules/NoiseGateModule.h"
-#include "Modules/ChorusModule.h"
 
-ModularFXAudioProcessorEditor::ModularFXAudioProcessorEditor(ModularFXAudioProcessor& p)
-    : AudioProcessorEditor(&p), audioProcessor(p)
+ModularFXAudioProcessor::ModularFXAudioProcessor()
+    : AudioProcessor(BusesProperties().withInput("Input", juce::AudioChannelSet::stereo(), true)
+                                      .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
+      apvts(*this, nullptr, "Parameters", createParameterLayout())
 {
-    addModuleBox.addItem("Add Reverser", 1);
-    addModuleBox.addItem("Add Noise Gate", 2);
-    addModuleBox.addItem("Add Chorus Ensemble", 3);
-    addModuleBox.onChange = [this] {
-        int id = addModuleBox.getSelectedId();
-        juce::ScopedLock sl(audioProcessor.processLock);
-        if (id == 1) audioProcessor.activeModules.push_back(std::make_unique<ReverserModule>(audioProcessor.apvts));
-        if (id == 2) audioProcessor.activeModules.push_back(std::make_unique<NoiseGateModule>(audioProcessor.apvts));
-        if (id == 3) audioProcessor.activeModules.push_back(std::make_unique<ChorusModule>(audioProcessor.apvts));
-        updateRackLayout();
-    };
-    addAndMakeVisible(addModuleBox);
-
-    setSize(900, 380);
-    updateRackLayout();
+    dspChain.push_back(std::make_unique<ReverserDSP>(apvts));
+    dspChain.push_back(std::make_unique<NoiseGateDSP>(apvts));
+    dspChain.push_back(std::make_unique<ChorusDSP>(apvts));
 }
 
-void ModularFXAudioProcessorEditor::updateRackLayout()
+juce::AudioProcessorValueTreeState::ParameterLayout ModularFXAudioProcessor::createParameterLayout()
 {
-    for (auto& module : audioProcessor.activeModules)
+    std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
+
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("REV_MIX", "Reverser Mix", 0.0f, 1.0f, 0.5f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("REV_TIME", "Reverser Time", 0.0f, 1.0f, 0.25f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("GATE_THRESH", "Gate Threshold", -60.0f, 0.0f, -30.0f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("GATE_ATTACK", "Gate Attack", 1.0f, 100.0f, 37.0f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("GATE_RELEASE", "Gate Release", 10.0f, 1000.0f, 200.0f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("CHO_DEPTH", "Chorus Depth", 0.0f, 1.0f, 0.6f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("CHO_AMOUNT", "Chorus Amount", 0.0f, 1.0f, 0.5f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("CHO_SPEED", "Chorus Speed", 0.1f, 10.0f, 1.2f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("CHO_BASS", "Chorus Bass", -12.0f, 12.0f, 0.0f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("CHO_TREBLE", "Chorus Treble", -12.0f, 12.0f, 0.0f));
+
+    return { params.begin(), params.end() };
+}
+
+void ModularFXAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
+{
+    juce::ScopedLock sl(processLock);
+    for (auto& dsp : dspChain)
+        dsp->prepareToPlay(sampleRate, samplesPerBlock);
+}
+
+void ModularFXAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi)
+{
+    juce::ScopedLock sl(processLock);
+    for (auto& dsp : dspChain)
     {
-        addAndMakeVisible(module.get());
-        module->onRemoveRequested = [this](ModuleBase* target) {
-            juce::ScopedLock sl(audioProcessor.processLock);
-            audioProcessor.activeModules.erase(
-                std::remove_if(audioProcessor.activeModules.begin(), audioProcessor.activeModules.end(),
-                               [target](const std::unique_ptr<ModuleBase>& m) { return m.get() == target; }),
-                audioProcessor.activeModules.end());
-            updateRackLayout();
-        };
-
-        module->onMoveRequested = [this](ModuleBase* target, int direction) {
-            juce::ScopedLock sl(audioProcessor.processLock);
-            auto it = std::find_if(audioProcessor.activeModules.begin(), audioProcessor.activeModules.end(),
-                                   [target](const std::unique_ptr<ModuleBase>& m) { return m.get() == target; });
-            if (it != audioProcessor.activeModules.end())
-            {
-                int idx = static_cast<int>(std::distance(audioProcessor.activeModules.begin(), it));
-                int newIdx = idx + direction;
-                if (newIdx >= 0 && newIdx < static_cast<int>(audioProcessor.activeModules.size()))
-                {
-                    std::swap(audioProcessor.activeModules[idx], audioProcessor.activeModules[newIdx]);
-                    updateRackLayout();
-                }
-            }
-        };
+        dsp->processBlock(buffer, midi);
     }
-    resized();
-    repaint();
 }
 
-void ModularFXAudioProcessorEditor::paint(juce::Graphics& g)
+juce::AudioProcessorEditor* ModularFXAudioProcessor::createEditor()
 {
-    g.fillAll(juce::Colour(0xFF1E1E1E));
-    g.setColour(juce::Colours::white);
-    g.setFont(juce::FontOptions(18.0f, juce::Font::bold));
-    g.drawText("Modular FX Suite", 16, 10, 200, 30, juce::Justification::left);
+    return new ModularFXAudioProcessorEditor(*this);
 }
 
-void ModularFXAudioProcessorEditor::resized()
+void ModularFXAudioProcessor::getStateInformation(juce::MemoryBlock& destData)
 {
-    addModuleBox.setBounds(getWidth() - 160, 10, 140, 25);
+    auto state = apvts.copyState();
+    std::unique_ptr<juce::XmlElement> xml(state.createXml());
+    copyXmlToBinary(*xml, destData);
+}
 
-    auto rackArea = getLocalBounds().removeFromBottom(getHeight() - 45).reduced(10);
-    int numModules = static_cast<int>(audioProcessor.activeModules.size());
-    if (numModules == 0) return;
+void ModularFXAudioProcessor::setStateInformation(const void* data, int sizeInBytes)
+{
+    std::unique_ptr<juce::XmlElement> xmlState(getXmlFromBinary(data, sizeInBytes));
+    if (xmlState != nullptr && xmlState->hasTagName(apvts.state.getType()))
+        apvts.replaceState(juce::ValueTree::fromXml(*xmlState));
+}
 
-    int modWidth = (rackArea.getWidth() - (10 * (numModules - 1))) / numModules;
-    for (int i = 0; i < numModules; ++i)
-    {
-        audioProcessor.activeModules[i]->setBounds(rackArea.removeFromLeft(modWidth));
-        rackArea.removeFromLeft(10);
-    }
+juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
+{
+    return new ModularFXAudioProcessor();
 }
