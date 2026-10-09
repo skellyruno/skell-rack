@@ -11,6 +11,18 @@ ModularFXAudioProcessor::ModularFXAudioProcessor()
     dspChain.push_back(std::make_unique<ChorusDSP>(apvts));
 }
 
+bool ModularFXAudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
+{
+    if (layouts.getMainOutputChannelSet() != juce::AudioChannelSet::mono()
+     && layouts.getMainOutputChannelSet() != juce::AudioChannelSet::stereo())
+        return false;
+
+    if (layouts.getMainOutputChannelSet() != layouts.getMainInputChannelSet())
+        return false;
+
+    return true;
+}
+
 juce::AudioProcessorValueTreeState::ParameterLayout ModularFXAudioProcessor::createParameterLayout()
 {
     std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
@@ -31,17 +43,28 @@ juce::AudioProcessorValueTreeState::ParameterLayout ModularFXAudioProcessor::cre
 
 void ModularFXAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
-    juce::ScopedLock sl(processLock);
+    const juce::ScopedLock sl(processLock);
     for (auto& dsp : dspChain)
-        dsp->prepareToPlay(sampleRate, samplesPerBlock);
+    {
+        if (dsp != nullptr)
+            dsp->prepareToPlay(sampleRate, samplesPerBlock);
+    }
 }
 
 void ModularFXAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi)
 {
-    juce::ScopedLock sl(processLock);
+    juce::ScopedNoDenormals noDenormals;
+    auto totalNumInputChannels  = getTotalNumInputChannels();
+    auto totalNumOutputChannels = getTotalNumOutputChannels();
+
+    for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
+        buffer.clear (i, 0, buffer.getNumSamples());
+
+    const juce::ScopedLock sl(processLock);
     for (auto& dsp : dspChain)
     {
-        dsp->processBlock(buffer, midi);
+        if (dsp != nullptr)
+            dsp->processBlock(buffer, midi);
     }
 }
 
@@ -54,7 +77,8 @@ void ModularFXAudioProcessor::getStateInformation(juce::MemoryBlock& destData)
 {
     auto state = apvts.copyState();
     std::unique_ptr<juce::XmlElement> xml(state.createXml());
-    copyXmlToBinary(*xml, destData);
+    if (xml != nullptr)
+        copyXmlToBinary(*xml, destData);
 }
 
 void ModularFXAudioProcessor::setStateInformation(const void* data, int sizeInBytes)
