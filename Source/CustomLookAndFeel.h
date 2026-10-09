@@ -13,7 +13,7 @@ public:
         const float rowSpacing = 22.0f;
         const float colSpacing = 44.0f;
 
-        for (float y = bounds.getBottom() + 20.0f; y > bounds.getY() + 80.0f; y -= rowSpacing)
+        for (float y = bounds.getBottom() + 20.0f; y > bounds.getY() + 40.0f; y -= rowSpacing)
         {
             const float rowDiff = (bounds.getBottom() - y) / rowSpacing;
             const float xOffset = (static_cast<int>(rowDiff) % 2 == 0) ? 0.0f : colSpacing * 0.5f;
