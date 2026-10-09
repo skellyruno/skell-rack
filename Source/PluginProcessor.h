@@ -37,16 +37,19 @@ public:
     void getStateInformation(juce::MemoryBlock& destData) override;
     void setStateInformation(const void* data, int sizeInBytes) override;
 
+    void updateModuleOrder(const std::vector<int>& newOrder);
+    std::vector<int> getModuleOrder() const;
+
     juce::AudioProcessorValueTreeState apvts;
 
     ReverserDSP reverser;
     NoiseGateDSP noiseGate;
     ChorusDSP chorus;
 
-    std::vector<int> activeModuleOrder { ID_Reverser, ID_NoiseGate, ID_Chorus };
-    juce::CriticalSection processLock;
-
 private:
+    std::atomic<int> moduleCount { 3 };
+    std::atomic<int> moduleOrder[3] { ID_Reverser, ID_NoiseGate, ID_Chorus };
+
     std::atomic<float>* revMixParam = nullptr;
     std::atomic<float>* gateThreshParam = nullptr;
     std::atomic<float>* choDepthParam = nullptr;
