@@ -64,6 +64,7 @@ public:
 
         threshSlider.setSliderStyle(juce::Slider::LinearHorizontal);
         threshSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+        addAndMakeVisible(threshSlider);
 
         attackAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, "GATE_ATTACK", attackSlider);
         releaseAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(apvts, "GATE_RELEASE", releaseSlider);
@@ -75,7 +76,12 @@ public:
         g.fillAll(juce::Colour(0xFF0F0F0F));
         paintHeader(g, juce::Colours::white);
 
-        auto scopeArea = getLocalBounds().removeFromTop(180).removeFromBottom(130).toFloat();
+        auto bounds = getLocalBounds();
+        if (bounds.getHeight() < 180) return;
+
+        auto scopeArea = bounds.removeFromTop(180).removeFromBottom(130).toFloat();
+        if (scopeArea.getHeight() <= 0.0f) return;
+
         g.setColour(juce::Colours::white.withAlpha(0.05f));
         g.drawRect(scopeArea);
 
@@ -114,6 +120,7 @@ public:
         resizedHeader();
         attackSlider.setBounds(20, getHeight() - 25, 100, 15);
         releaseSlider.setBounds(140, getHeight() - 25, 100, 15);
+        threshSlider.setBounds(0, 0, 0, 0); // Hidden backing control
     }
 
     void mouseDown(const juce::MouseEvent& e) override { if (thresholdPillBounds.contains(e.position)) isDraggingPill = true; }
@@ -121,7 +128,11 @@ public:
     {
         if (isDraggingPill)
         {
-            auto scopeArea = getLocalBounds().removeFromTop(180).removeFromBottom(130).toFloat();
+            auto bounds = getLocalBounds();
+            if (bounds.getHeight() < 180) return;
+            auto scopeArea = bounds.removeFromTop(180).removeFromBottom(130).toFloat();
+            if (scopeArea.getHeight() <= 0.0f) return;
+
             float norm = juce::jlimit(0.0f, 1.0f, (e.position.y - scopeArea.getY()) / scopeArea.getHeight());
             threshSlider.setValue(juce::jmap(norm, 1.0f, 0.0f, -60.0f, 0.0f));
             repaint();
@@ -208,9 +219,16 @@ ModularFXAudioProcessorEditor::ModularFXAudioProcessorEditor(ModularFXAudioProce
 
         {
             const juce::ScopedLock sl(audioProcessor.processLock);
-            if (id == 1) audioProcessor.dspChain.push_back(std::make_unique<ReverserDSP>(audioProcessor.apvts));
-            else if (id == 2) audioProcessor.dspChain.push_back(std::make_unique<NoiseGateDSP>(audioProcessor.apvts));
-            else if (id == 3) audioProcessor.dspChain.push_back(std::make_unique<ChorusDSP>(audioProcessor.apvts));
+            std::unique_ptr<DSPModuleBase> newDsp;
+            if (id == 1) newDsp = std::make_unique<ReverserDSP>(audioProcessor.apvts);
+            else if (id == 2) newDsp = std::make_unique<NoiseGateDSP>(audioProcessor.apvts);
+            else if (id == 3) newDsp = std::make_unique<ChorusDSP>(audioProcessor.apvts);
+
+            if (newDsp != nullptr)
+            {
+                newDsp->prepareToPlay(audioProcessor.lastSampleRate, audioProcessor.lastBlockSize);
+                audioProcessor.dspChain.push_back(std::move(newDsp));
+            }
         }
 
         addModuleBox.setSelectedId(0, juce::dontSendNotification);
