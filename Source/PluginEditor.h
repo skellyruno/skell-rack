@@ -25,7 +25,6 @@ public:
 
     virtual ~ModuleCardBase() override = default;
 
-    std::function<void(int)> onBypassToggled;
     std::function<void(int, int)> onMoveRequested;
     std::function<void(int)> onRemoveRequested;
 
@@ -38,7 +37,6 @@ protected:
         g.setFont(juce::FontOptions(15.0f, juce::Font::bold));
         g.drawText(moduleTitle, 55, 6, 120, 24, juce::Justification::left);
 
-        // Visual Drag Handle Corner Indicators
         g.setColour(textColour.withAlpha(0.25f));
         int w = getWidth(), h = getHeight();
         if (w > 20 && h > 20)
@@ -60,7 +58,6 @@ protected:
 
     void setupHeaderCallbacks()
     {
-        bypassButton.onClick = [this] { if (onBypassToggled) onBypassToggled(moduleId); };
         moveLeftButton.onClick = [this] { if (onMoveRequested) onMoveRequested(moduleId, -1); };
         moveRightButton.onClick = [this] { if (onMoveRequested) onMoveRequested(moduleId, 1); };
         removeButton.onClick = [this] { if (onRemoveRequested) onRemoveRequested(moduleId); };
@@ -95,8 +92,7 @@ public:
         timeAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(p.apvts, "REV_TIME", timeSlider);
 
         bypassButton.onClick = [this] {
-            bool active = bypassButton.getToggleState();
-            processor.reverser.setBypassed(!active);
+            processor.reverser.setBypassed(!bypassButton.getToggleState());
         };
     }
 
@@ -157,8 +153,7 @@ public:
         threshAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(p.apvts, "GATE_THRESH", threshSlider);
 
         bypassButton.onClick = [this] {
-            bool active = bypassButton.getToggleState();
-            processor.noiseGate.setBypassed(!active);
+            processor.noiseGate.setBypassed(!bypassButton.getToggleState());
         };
     }
 
@@ -263,8 +258,7 @@ public:
         trebleAttach = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(p.apvts, "CHO_TREBLE", trebleSlider);
 
         bypassButton.onClick = [this] {
-            bool active = bypassButton.getToggleState();
-            processor.chorus.setBypassed(!active);
+            processor.chorus.setBypassed(!bypassButton.getToggleState());
         };
     }
 
