@@ -4,7 +4,6 @@ project(ModularFXSuite VERSION 1.0.0 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Fetch JUCE framework automatically via FetchContent
 include(FetchContent)
 FetchContent_Declare(
     JUCE
@@ -31,12 +30,10 @@ juce_generate_juce_header(ModularFXSuite)
 
 target_sources(ModularFXSuite
     PRIVATE
-        Source/CustomLookAndFeel.h
         Source/PluginProcessor.h
         Source/PluginProcessor.cpp
         Source/PluginEditor.h
         Source/PluginEditor.cpp
-        Source/Modules/DSPModules.h
 )
 
 target_compile_definitions(ModularFXSuite
