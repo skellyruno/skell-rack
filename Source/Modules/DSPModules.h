@@ -17,6 +17,8 @@ public:
 
     void processBlock(juce::AudioBuffer<float>& buffer, float mix)
     {
+        if (bypassed.load(std::memory_order_relaxed)) return;
+
         int numInputChannels = buffer.getNumChannels();
         int numSamples = buffer.getNumSamples();
         int bufSize = circularBuffer.getNumSamples();
@@ -46,7 +48,11 @@ public:
         }
     }
 
+    void setBypassed(bool bypass) { bypassed.store(bypass, std::memory_order_relaxed); }
+    bool isBypassed() const { return bypassed.load(std::memory_order_relaxed); }
+
 private:
+    std::atomic<bool> bypassed { false };
     juce::AudioBuffer<float> circularBuffer;
     int writePos = 0;
     double currentSampleRate = 44100.0;
@@ -59,6 +65,8 @@ public:
 
     void processBlock(juce::AudioBuffer<float>& buffer, float threshDb)
     {
+        if (bypassed.load(std::memory_order_relaxed)) return;
+
         int numChannels = buffer.getNumChannels();
         int numSamples = buffer.getNumSamples();
         if (numChannels == 0 || numSamples == 0) return;
@@ -76,7 +84,11 @@ public:
         }
     }
 
+    void setBypassed(bool bypass) { bypassed.store(bypass, std::memory_order_relaxed); }
+    bool isBypassed() const { return bypassed.load(std::memory_order_relaxed); }
+
 private:
+    std::atomic<bool> bypassed { false };
     float currentEnvelope = 0.0f;
 };
 
@@ -94,6 +106,8 @@ public:
 
     void processBlock(juce::AudioBuffer<float>& buffer, float depth, float rate)
     {
+        if (bypassed.load(std::memory_order_relaxed)) return;
+
         int numChannels = buffer.getNumChannels();
         int numSamples = buffer.getNumSamples();
         int bufSize = delayBuffer.getNumSamples();
@@ -131,7 +145,11 @@ public:
         }
     }
 
+    void setBypassed(bool bypass) { bypassed.store(bypass, std::memory_order_relaxed); }
+    bool isBypassed() const { return bypassed.load(std::memory_order_relaxed); }
+
 private:
+    std::atomic<bool> bypassed { false };
     juce::AudioBuffer<float> delayBuffer;
     int writePos = 0;
     float lfoPhase = 0.0f;
