@@ -23,10 +23,10 @@ ReverserModule::~ReverserModule()
     timeSlider.setLookAndFeel(nullptr);
 }
 
-void ReverserModule::prepareToPlay(double sampleRate, int samplesPerBlock)
+void ReverserModule::prepareToPlay(double sampleRate, int /*samplesPerBlock*/)
 {
-    currentSampleRate = sampleRate;
-    circularBuffer.setSize(2, static_cast<int>(sampleRate * 2.0));
+    currentSampleRate = (sampleRate > 0.0) ? sampleRate : 44100.0;
+    circularBuffer.setSize(2, static_cast<int>(currentSampleRate * 2.0));
     circularBuffer.clear();
     writePos = 0;
 }
@@ -35,8 +35,13 @@ void ReverserModule::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBu
 {
     if (getIsBypassed()) return;
 
-    float mix = mixSlider.getValue();
-    int grainSize = static_cast<int>(currentSampleRate * 0.25f); // Sync fraction
+    // Read thread-safely from APVTS instead of GUI slider
+    float mix = apvts.getRawParameterValue("REV_MIX")->load();
+    int bufSize = circularBuffer.getNumSamples();
+    if (bufSize <= 0) return;
+
+    int grainSize = static_cast<int>(currentSampleRate * 0.25);
+    if (grainSize <= 0) grainSize = 1000; // Guard against division by zero
 
     for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
     {
@@ -48,21 +53,24 @@ void ReverserModule::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBu
             float dry = channelData[i];
             ringData[writePos] = dry;
 
-            int readPos = (writePos - (writePos % grainSize)) + (grainSize - (writePos % grainSize) - 1);
-            readPos = (readPos + circularBuffer.getNumSamples()) % circularBuffer.getNumSamples();
+            int offsetWithinGrain = writePos % grainSize;
+            int readPos = (writePos - offsetWithinGrain) + (grainSize - offsetWithinGrain - 1);
+
+            // Safe positive modulo wraparound
+            readPos = ((readPos % bufSize) + bufSize) % bufSize;
 
             float wet = ringData[readPos];
             channelData[i] = dry * (1.0f - mix) + wet * mix;
 
             if (ch == buffer.getNumChannels() - 1)
-                writePos = (writePos + 1) % circularBuffer.getNumSamples();
+                writePos = (writePos + 1) % bufSize;
         }
     }
 }
 
 void ReverserModule::paint(juce::Graphics& g)
 {
-    g.fillAll(juce::Colour(0xFF121212)); // Dark minimalist canvas
+    g.fillAll(juce::Colour(0xFF121212));
     paintHeader(g, juce::Colours::white);
 
     g.setColour(juce::Colours::grey);
