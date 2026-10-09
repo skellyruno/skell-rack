@@ -1,32 +1,25 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
-#include "Modules/ReverserModule.h"
-#include "Modules/NoiseGateModule.h"
-#include "Modules/ChorusModule.h"
 
 ModularFXAudioProcessor::ModularFXAudioProcessor()
     : AudioProcessor(BusesProperties().withInput("Input", juce::AudioChannelSet::stereo(), true)
                                       .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
       apvts(*this, nullptr, "Parameters", createParameterLayout())
 {
-    activeModules.push_back(std::make_unique<ReverserModule>(apvts));
-    activeModules.push_back(std::make_unique<NoiseGateModule>(apvts));
-    activeModules.push_back(std::make_unique<ChorusModule>(apvts));
+    dspChain.push_back(std::make_unique<ReverserDSP>(apvts));
+    dspChain.push_back(std::make_unique<NoiseGateDSP>(apvts));
+    dspChain.push_back(std::make_unique<ChorusDSP>(apvts));
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout ModularFXAudioProcessor::createParameterLayout()
 {
     std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
 
-    // Reverser
     params.push_back(std::make_unique<juce::AudioParameterFloat>("REV_MIX", "Reverser Mix", 0.0f, 1.0f, 0.5f));
     params.push_back(std::make_unique<juce::AudioParameterFloat>("REV_TIME", "Reverser Time", 0.0f, 1.0f, 0.25f));
-
-    // Noise Gate
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("GATE_THRESH", "Gate Threshold", -60.0f, 0.0f, -30.0f));
     params.push_back(std::make_unique<juce::AudioParameterFloat>("GATE_ATTACK", "Gate Attack", 1.0f, 100.0f, 37.0f));
     params.push_back(std::make_unique<juce::AudioParameterFloat>("GATE_RELEASE", "Gate Release", 10.0f, 1000.0f, 200.0f));
-
-    // Chorus
     params.push_back(std::make_unique<juce::AudioParameterFloat>("CHO_DEPTH", "Chorus Depth", 0.0f, 1.0f, 0.6f));
     params.push_back(std::make_unique<juce::AudioParameterFloat>("CHO_AMOUNT", "Chorus Amount", 0.0f, 1.0f, 0.5f));
     params.push_back(std::make_unique<juce::AudioParameterFloat>("CHO_SPEED", "Chorus Speed", 0.1f, 10.0f, 1.2f));
@@ -39,16 +32,16 @@ juce::AudioProcessorValueTreeState::ParameterLayout ModularFXAudioProcessor::cre
 void ModularFXAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
     juce::ScopedLock sl(processLock);
-    for (auto& module : activeModules)
-        module->prepareToPlay(sampleRate, samplesPerBlock);
+    for (auto& dsp : dspChain)
+        dsp->prepareToPlay(sampleRate, samplesPerBlock);
 }
 
 void ModularFXAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi)
 {
     juce::ScopedLock sl(processLock);
-    for (auto& module : activeModules)
+    for (auto& dsp : dspChain)
     {
-        module->processBlock(buffer, midi);
+        dsp->processBlock(buffer, midi);
     }
 }
 
