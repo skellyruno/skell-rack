@@ -1,12 +1,13 @@
 #pragma once
 #include <JuceHeader.h>
 
-// Vector utility to draw Japanese Seigaiha concentric wave patterns
 class SeigaihaDrawer
 {
 public:
     static void drawPattern(juce::Graphics& g, juce::Rectangle<float> bounds, juce::Colour waveColor)
     {
+        if (bounds.isEmpty()) return;
+
         g.setColour(waveColor.withAlpha(0.25f));
         const float radiusStep = 14.0f;
         const float rowSpacing = 22.0f;
@@ -32,7 +33,6 @@ public:
     }
 };
 
-// Custom LookAndFeel for Slate-Blue Teardrop Knobs
 class TeardropKnobLookAndFeel : public juce::LookAndFeel_V4
 {
 public:
@@ -40,12 +40,18 @@ public:
                           float sliderPosProportional, float rotaryStartAngle,
                           float rotaryEndAngle, juce::Slider& /*slider*/) override
     {
+        if (width <= 0 || height <= 0) return;
+
         auto bounds = juce::Rectangle<float>(static_cast<float>(x),
                                             static_cast<float>(y),
                                             static_cast<float>(width),
                                             static_cast<float>(height)).reduced(6.0f);
+        if (bounds.isEmpty()) return;
+
         auto center = bounds.getCentre();
         auto radius = juce::jmin(bounds.getWidth(), bounds.getHeight()) * 0.5f;
+        if (radius <= 2.0f) return;
+
         auto angle = rotaryStartAngle + sliderPosProportional * (rotaryEndAngle - rotaryStartAngle);
 
         g.setColour(juce::Colours::black.withAlpha(0.15f));
@@ -74,7 +80,6 @@ public:
     }
 };
 
-// Custom LookAndFeel for Minimalist Purple Arc Knobs
 class PurpleArcKnobLookAndFeel : public juce::LookAndFeel_V4
 {
 public:
@@ -82,31 +87,33 @@ public:
                           float sliderPosProportional, float rotaryStartAngle,
                           float rotaryEndAngle, juce::Slider& /*slider*/) override
     {
+        if (width <= 0 || height <= 0) return;
+
         auto bounds = juce::Rectangle<float>(static_cast<float>(x),
                                             static_cast<float>(y),
                                             static_cast<float>(width),
                                             static_cast<float>(height)).reduced(8.0f);
+        if (bounds.isEmpty()) return;
+
         auto center = bounds.getCentre();
         auto radius = juce::jmin(bounds.getWidth(), bounds.getHeight()) * 0.5f;
+        if (radius <= 2.0f) return;
+
         auto angle = rotaryStartAngle + sliderPosProportional * (rotaryEndAngle - rotaryStartAngle);
 
-        // Purple Arc Frame
         juce::Path arcPath;
         arcPath.addCentredArc(center.x, center.y, radius + 4.0f, radius + 4.0f, 0.0f, rotaryStartAngle, angle, true);
-        g.setColour(juce::Colour(0xFFA020F0)); // Vibrant purple
+        g.setColour(juce::Colour(0xFFA020F0));
         g.strokePath(arcPath, juce::PathStrokeType(3.5f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
 
-        // Background Arc Track
         juce::Path trackPath;
         trackPath.addCentredArc(center.x, center.y, radius + 4.0f, radius + 4.0f, 0.0f, angle, rotaryEndAngle, true);
         g.setColour(juce::Colours::white.withAlpha(0.15f));
         g.strokePath(trackPath, juce::PathStrokeType(2.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
 
-        // White Knob Body
         g.setColour(juce::Colours::white);
         g.fillEllipse(bounds);
 
-        // Pointer Line
         juce::Path pointer;
         pointer.startNewSubPath(center);
         pointer.lineTo(center.x + std::sin(angle) * (radius * 0.7f),
