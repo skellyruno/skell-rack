@@ -34,12 +34,3 @@ jobs:
         name: ModularFXSuite-VST3-Windows
         path: build/ModularFXSuite_artefacts/Release/VST3/*.vst3
 
-    # Package macOS build outputs (VST3 and AU) as downloadable artifacts
-    - name: Upload macOS Artifacts
-      if: runner.os == 'macOS'
-      uses: actions/upload-artifact@v4
-      with:
-        name: ModularFXSuite-macOS
-        path: |
-          build/ModularFXSuite_artefacts/Release/VST3/*.vst3
-          build/ModularFXSuite_artefacts/Release/AU/*.component
