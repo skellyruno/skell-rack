@@ -89,7 +89,6 @@ void ModularFXAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juc
     float depth = choDepthParam ? choDepthParam->load() : 0.0f;
     float speed = choSpeedParam ? choSpeedParam->load() : 1.0f;
 
-    // Lock-free realtime execution
     int count = moduleCount.load(std::memory_order_acquire);
     for (int i = 0; i < count; ++i)
     {
