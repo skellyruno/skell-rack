@@ -8,7 +8,7 @@ public:
     ModularFXAudioProcessor();
     ~ModularFXAudioProcessor() override = default;
 
-    void prepareToPlay(doubl sampleRate, int samplesPerBlock) override;
+    void prepareToPlay(double sampleRate, int samplesPerBlock) override;
     void releaseResources() override {}
     bool isBusesLayoutSupported(const BusesLayout& layouts) const override;
     void processBlock(juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
