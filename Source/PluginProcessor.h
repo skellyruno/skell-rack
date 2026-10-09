@@ -48,7 +48,7 @@ public:
 
 private:
     std::atomic<int> moduleCount { 3 };
-    std::atomic<int> moduleOrder[3] { ID_Reverser, ID_NoiseGate, ID_Chorus };
+    std::atomic<int> moduleOrder[3];
 
     std::atomic<float>* revMixParam = nullptr;
     std::atomic<float>* gateThreshParam = nullptr;
