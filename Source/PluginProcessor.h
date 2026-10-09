@@ -1,6 +1,6 @@
 #pragma once
 #include <JuceHeader.h>
-#include "Modules/ModuleBase.h"
+#include "Modules/DSPModules.h"
 
 class ModularFXAudioProcessor : public juce::AudioProcessor
 {
@@ -30,7 +30,7 @@ public:
     void setStateInformation(const void* data, int sizeInBytes) override;
 
     juce::AudioProcessorValueTreeState apvts;
-    std::vector<std::unique_ptr<ModuleBase>> activeModules;
+    std::vector<std::unique_ptr<DSPModuleBase>> dspChain;
     juce::CriticalSection processLock;
 
 private:
