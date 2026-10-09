@@ -70,7 +70,7 @@ public:
         g.fillPath(teardrop);
 
         g.setColour(juce::Colour(0xFF7A9BB0).withMultipliedAlpha(0.6f));
-        g.drawPath(teardrop, juce::PathStrokeType(1.2f));
+        g.strokePath(teardrop, juce::PathStrokeType(1.2f));
     }
 };
 
