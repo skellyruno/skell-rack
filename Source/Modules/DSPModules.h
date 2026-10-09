@@ -51,31 +51,28 @@ public:
 
         auto* mixParam = apvts.getRawParameterValue("REV_MIX");
         float mix = mixParam ? mixParam->load() : 0.5f;
+        mix = juce::jlimit(0.0f, 1.0f, mix);
 
         int processChannels = std::min(numInputChannels, circularBuffer.getNumChannels());
         int grainSize = static_cast<int>(currentSampleRate * 0.25);
         if (grainSize <= 0) grainSize = 1000;
 
-        for (int ch = 0; ch < processChannels; ++ch)
+        // Correct sample-first processing loop
+        for (int i = 0; i < numSamples; ++i)
         {
-            auto* channelData = buffer.getWritePointer(ch);
-            auto* ringData = circularBuffer.getWritePointer(ch);
+            int offsetWithinGrain = writePos % grainSize;
+            int readPos = (writePos - offsetWithinGrain) + (grainSize - offsetWithinGrain - 1);
+            readPos = ((readPos % bufSize) + bufSize) % bufSize;
 
-            for (int i = 0; i < numSamples; ++i)
+            for (int ch = 0; ch < processChannels; ++ch)
             {
-                float dry = channelData[i];
-                ringData[writePos] = dry;
-
-                int offsetWithinGrain = writePos % grainSize;
-                int readPos = (writePos - offsetWithinGrain) + (grainSize - offsetWithinGrain - 1);
-                readPos = ((readPos % bufSize) + bufSize) % bufSize;
-
-                float wet = ringData[readPos];
-                channelData[i] = dry * (1.0f - mix) + wet * mix;
-
-                if (ch == processChannels - 1)
-                    writePos = (writePos + 1) % bufSize;
+                float dry = buffer.getSample(ch, i);
+                circularBuffer.setSample(ch, writePos, dry);
+                float wet = circularBuffer.getSample(ch, readPos);
+                buffer.setSample(ch, i, dry * (1.0f - mix) + wet * mix);
             }
+
+            writePos = (writePos + 1) % bufSize;
         }
     }
 
