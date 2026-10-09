@@ -1,34 +1,10 @@
 #pragma once
 #include <JuceHeader.h>
 
-enum class ModuleType { Reverser, NoiseGate, Chorus };
-
-class DSPModuleBase
+class ReverserDSP
 {
 public:
-    DSPModuleBase(ModuleType t) : type(t) {}
-    virtual ~DSPModuleBase() = default;
-
-    virtual void prepareToPlay(double sampleRate, int samplesPerBlock) = 0;
-    virtual void processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi) = 0;
-
-    void setBypassed(bool bypass) { bypassed.store(bypass, std::memory_order_relaxed); }
-    bool isBypassed() const { return bypassed.load(std::memory_order_relaxed); }
-    ModuleType getType() const { return type; }
-
-protected:
-    ModuleType type;
-    std::atomic<bool> bypassed { false };
-};
-
-// --- Reverser DSP ---
-class ReverserDSP : public DSPModuleBase
-{
-public:
-    ReverserDSP(juce::AudioProcessorValueTreeState& vts) 
-        : DSPModuleBase(ModuleType::Reverser), apvts(vts) {}
-
-    void prepareToPlay(double sampleRate, int) override
+    void prepareToPlay(double sampleRate, int)
     {
         currentSampleRate = (sampleRate > 1000.0) ? sampleRate : 44100.0;
         int bufSamples = static_cast<int>(currentSampleRate * 2.0);
@@ -39,25 +15,19 @@ public:
         writePos = 0;
     }
 
-    void processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&) override
+    void processBlock(juce::AudioBuffer<float>& buffer, float mix)
     {
-        if (isBypassed()) return;
-
         int numInputChannels = buffer.getNumChannels();
         int numSamples = buffer.getNumSamples();
         int bufSize = circularBuffer.getNumSamples();
 
         if (numInputChannels == 0 || numSamples == 0 || bufSize <= 0) return;
 
-        auto* mixParam = apvts.getRawParameterValue("REV_MIX");
-        float mix = mixParam ? mixParam->load() : 0.5f;
         mix = juce::jlimit(0.0f, 1.0f, mix);
-
         int processChannels = std::min(numInputChannels, circularBuffer.getNumChannels());
         int grainSize = static_cast<int>(currentSampleRate * 0.25);
         if (grainSize <= 0) grainSize = 1000;
 
-        // Correct sample-first processing loop
         for (int i = 0; i < numSamples; ++i)
         {
             int offsetWithinGrain = writePos % grainSize;
@@ -77,31 +47,22 @@ public:
     }
 
 private:
-    juce::AudioProcessorValueTreeState& apvts;
     juce::AudioBuffer<float> circularBuffer;
     int writePos = 0;
     double currentSampleRate = 44100.0;
 };
 
-// --- Noise Gate DSP ---
-class NoiseGateDSP : public DSPModuleBase
+class NoiseGateDSP
 {
 public:
-    NoiseGateDSP(juce::AudioProcessorValueTreeState& vts) 
-        : DSPModuleBase(ModuleType::NoiseGate), apvts(vts) {}
+    void prepareToPlay(double, int) {}
 
-    void prepareToPlay(double, int) override {}
-
-    void processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&) override
+    void processBlock(juce::AudioBuffer<float>& buffer, float threshDb)
     {
-        if (isBypassed()) return;
-
         int numChannels = buffer.getNumChannels();
         int numSamples = buffer.getNumSamples();
         if (numChannels == 0 || numSamples == 0) return;
 
-        auto* threshParam = apvts.getRawParameterValue("GATE_THRESH");
-        float threshDb = threshParam ? threshParam->load() : -30.0f;
         float threshLinear = juce::Decibels::decibelsToGain(threshDb);
 
         for (int i = 0; i < numSamples; ++i)
@@ -116,24 +77,63 @@ public:
     }
 
 private:
-    juce::AudioProcessorValueTreeState& apvts;
     float currentEnvelope = 0.0f;
 };
 
-// --- Chorus DSP ---
-class ChorusDSP : public DSPModuleBase
+class ChorusDSP
 {
 public:
-    ChorusDSP(juce::AudioProcessorValueTreeState& vts) 
-        : DSPModuleBase(ModuleType::Chorus), apvts(vts) {}
-
-    void prepareToPlay(double, int) override {}
-
-    void processBlock(juce::AudioBuffer<float>&, juce::MidiBuffer&) override
+    void prepareToPlay(double sampleRate, int)
     {
-        if (isBypassed()) return;
+        currentSampleRate = (sampleRate > 1000.0) ? sampleRate : 44100.0;
+        delayBuffer.setSize(2, static_cast<int>(currentSampleRate * 0.1), false, true, true);
+        delayBuffer.clear();
+        writePos = 0;
+        lfoPhase = 0.0f;
+    }
+
+    void processBlock(juce::AudioBuffer<float>& buffer, float depth, float rate)
+    {
+        int numChannels = buffer.getNumChannels();
+        int numSamples = buffer.getNumSamples();
+        int bufSize = delayBuffer.getNumSamples();
+        if (numChannels == 0 || numSamples == 0 || bufSize <= 0) return;
+
+        int processChannels = std::min(numChannels, delayBuffer.getNumChannels());
+        float lfoInc = (rate * juce::MathConstants<float>::twoPi) / static_cast<float>(currentSampleRate);
+
+        for (int i = 0; i < numSamples; ++i)
+        {
+            lfoPhase += lfoInc;
+            if (lfoPhase >= juce::MathConstants<float>::twoPi) lfoPhase -= juce::MathConstants<float>::twoPi;
+
+            float modDelay = (std::sin(lfoPhase) * 0.5f + 0.5f) * (depth * 0.02f) * static_cast<float>(currentSampleRate);
+            float readPos = static_cast<float>(writePos) - modDelay;
+            if (readPos < 0.0f) readPos += static_cast<float>(bufSize);
+
+            int iRead = static_cast<int>(readPos);
+            float frac = readPos - static_cast<float>(iRead);
+            int iReadNext = (iRead + 1) % bufSize;
+
+            for (int ch = 0; ch < processChannels; ++ch)
+            {
+                float dry = buffer.getSample(ch, i);
+                delayBuffer.setSample(ch, writePos, dry);
+
+                float sample1 = delayBuffer.getSample(ch, iRead);
+                float sample2 = delayBuffer.getSample(ch, iReadNext);
+                float wet = sample1 + frac * (sample2 - sample1);
+
+                buffer.setSample(ch, i, dry * 0.6f + wet * 0.4f);
+            }
+
+            writePos = (writePos + 1) % bufSize;
+        }
     }
 
 private:
-    juce::AudioProcessorValueTreeState& apvts;
+    juce::AudioBuffer<float> delayBuffer;
+    int writePos = 0;
+    float lfoPhase = 0.0f;
+    double currentSampleRate = 44100.0;
 };
