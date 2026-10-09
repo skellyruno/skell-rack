@@ -1,5 +1,6 @@
 #pragma once
 #include <JuceHeader.h>
+#include "Modules/DSPModules.h"
 
 class ModularFXAudioProcessor : public juce::AudioProcessor
 {
@@ -32,6 +33,14 @@ public:
     juce::AudioProcessorValueTreeState apvts;
 
 private:
-    std::atomic<float>* gainParam = nullptr;
+    ReverserDSP reverser;
+    NoiseGateDSP noiseGate;
+    ChorusDSP chorus;
+
+    std::atomic<float>* revMixParam = nullptr;
+    std::atomic<float>* gateThreshParam = nullptr;
+    std::atomic<float>* choDepthParam = nullptr;
+    std::atomic<float>* choSpeedParam = nullptr;
+
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 };
