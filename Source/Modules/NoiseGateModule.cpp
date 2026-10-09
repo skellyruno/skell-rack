@@ -35,15 +35,13 @@ void NoiseGateModule::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiB
 
 void NoiseGateModule::paint(juce::Graphics& g)
 {
-    g.fillAll(juce::Colour(0xFF0F0F0F)); // Dark scope background
+    g.fillAll(juce::Colour(0xFF0F0F0F));
     paintHeader(g, juce::Colours::white);
 
-    // Waveform Scope Canvas Area
     auto scopeArea = getLocalBounds().removeFromTop(180).removeFromBottom(130).toFloat();
     g.setColour(juce::Colours::white.withAlpha(0.05f));
     g.drawRect(scopeArea);
 
-    // Simulated Dynamic Waveform
     juce::Path wave;
     wave.startNewSubPath(scopeArea.getX(), scopeArea.getCentreY());
     for (float x = scopeArea.getX(); x < scopeArea.getRight(); x += 5.0f)
@@ -51,15 +49,14 @@ void NoiseGateModule::paint(juce::Graphics& g)
         float y = scopeArea.getCentreY() + std::sin(x * 0.05f) * 35.0f;
         wave.lineTo(x, y);
     }
-    g.setColour(juce::Colour(0xFFFFB703)); // Gold scope line
+    g.setColour(juce::Colour(0xFFFFB703));
     g.strokePath(wave, juce::PathStrokeType(1.5f));
 
-    // Interactive Threshold Drag Line and Pill
     float normalizedThresh = juce::jmap(thresholdDb, -60.0f, 0.0f, scopeArea.getBottom(), scopeArea.getY());
     g.setColour(juce::Colours::white.withAlpha(0.6f));
     g.drawDashedLine(juce::Line<float>(scopeArea.getX(), normalizedThresh, scopeArea.getRight(), normalizedThresh), nullptr, 0, 2);
 
-    thresholdPillBounds = juce::Rectangle<float>(scopeArea.getCentreX() - 55, normalizedThresh - 14, 110, 28);
+    thresholdPillBounds = juce::Rectangle<float>(scopeArea.getCentreX() - 55.0f, normalizedThresh - 14.0f, 110.0f, 28.0f);
     g.setColour(juce::Colour(0xFF1E1E1E));
     g.fillRoundedRectangle(thresholdPillBounds, 14.0f);
     g.setColour(juce::Colours::white);
@@ -67,13 +64,12 @@ void NoiseGateModule::paint(juce::Graphics& g)
     g.setFont(juce::FontOptions(13.0f, juce::Font::bold));
     g.drawText("Threshold  ↕", thresholdPillBounds, juce::Justification::centred);
 
-    // Dynamic dB Readout display on scope
     g.drawText(juce::String(thresholdDb, 1) + " dB", scopeArea.removeFromLeft(80).removeFromTop(30), juce::Justification::centred);
 
-    // Bottom Analog Controls
+    // Thread-safe UI readings directly from Slider values on the GUI thread
     g.setFont(juce::FontOptions(12.0f));
-    g.drawText("Attack: " + juce::String(attackSlider.getValue(), 0) + " ms", 20, getHeight() - 40, 100, 20, juce::Justification::left);
-    g.drawText("Release: " + juce::String(releaseSlider.getValue(), 0) + " ms", 140, getHeight() - 40, 100, 20, juce::Justification::left);
+    g.drawText("Attack: " + juce::String(static_cast<float>(attackSlider.getValue()), 0) + " ms", 20, getHeight() - 40, 100, 20, juce::Justification::left);
+    g.drawText("Release: " + juce::String(static_cast<float>(releaseSlider.getValue()), 0) + " ms", 140, getHeight() - 40, 100, 20, juce::Justification::left);
 }
 
 void NoiseGateModule::resized()
