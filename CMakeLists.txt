@@ -36,13 +36,7 @@ target_sources(ModularFXSuite
         Source/PluginProcessor.cpp
         Source/PluginEditor.h
         Source/PluginEditor.cpp
-        Source/Modules/ModuleBase.h
-        Source/Modules/ReverserModule.h
-        Source/Modules/ReverserModule.cpp
-        Source/Modules/NoiseGateModule.h
-        Source/Modules/NoiseGateModule.cpp
-        Source/Modules/ChorusModule.h
-        Source/Modules/ChorusModule.cpp
+        Source/Modules/DSPModules.h
 )
 
 target_compile_definitions(ModularFXSuite
